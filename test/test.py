@@ -1,3 +1,4 @@
+from Discriminator import Discriminator
 from Generateur import Generator
 from gan import get_generator_block, get_noise, get_discriminator_block
 from torch import nn
@@ -73,5 +74,23 @@ def test_disc_block(in_features, out_features, num_test=10000):
 
 test_disc_block(25,12)
 test_disc_block(15,18)
+print("Success!")
+
+
+def test_discriminator(z_dim, hidden_dim, num_test=100):
+    disc = Discriminator(z_dim, hidden_dim).get_disc()
+
+    assert len(disc) == 4
+
+
+    test_input = torch.randn(num_test, z_dim)
+    test_output = disc(test_input)
+    assert tuple(test_output.shape) == (num_test, 1)
+
+
+    assert not isinstance(disc[-1], nn.Sequential)
+
+test_discriminator(5,10)
+test_discriminator(20, 8)
 print("Success!")
 
