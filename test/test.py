@@ -9,7 +9,7 @@ from gan import get_generator_block, get_noise, get_discriminator_block
 from torch import nn
 import torch
 
-from loss import get_disc_loss
+from loss import get_disc_loss, get_gen_loss
 
 
 def test_gen_block(in_features, out_features, num_test=1000):
@@ -147,9 +147,9 @@ def test_disc_loss(max_tests=10):
     criterion = nn.BCEWithLogitsLoss()
     batch_size = 128
     lr = 0.00001
-    device = 'cuda'
+    device = 'cpu'
     dataloader = DataLoader(
-        MNIST('.', download=False, transform=transforms.ToTensor()),
+        MNIST('.', download=True, transform=transforms.ToTensor()),
         batch_size=batch_size,
         shuffle=True)
     z_dim = 64
@@ -191,3 +191,53 @@ def test_disc_loss(max_tests=10):
 test_disc_resonable()
 test_disc_loss()
 print("Success!1")
+
+
+def test_gen_reasonable(num_images=10):
+    import inspect, re
+    lines = inspect.getsource(get_gen_loss)
+    assert (re.search(r"to\(.cuda.\)", lines)) is None
+    assert (re.search(r"\.cuda\(\)", lines)) is None
+
+    z_dim = 64
+    gen = torch.zeros_like
+    disc = nn.Identity()
+    criterion = torch.mul  # Multiply
+    gen_loss_tensor = get_gen_loss(gen, disc, criterion, num_images, z_dim, 'cpu')
+    assert torch.all(torch.abs(gen_loss_tensor) < 1e-5)
+    # Verify shape. Related to gen_noise parametrization
+    assert tuple(gen_loss_tensor.shape) == (num_images, z_dim)
+
+    gen = torch.ones_like
+    disc = nn.Identity()
+    criterion = torch.mul  # Multiply
+    gen_loss_tensor = get_gen_loss(gen, disc, criterion, num_images, z_dim, 'cpu')
+    assert torch.all(torch.abs(gen_loss_tensor - 1) < 1e-5)
+    # Verify shape. Related to gen_noise parametrization
+    assert tuple(gen_loss_tensor.shape) == (num_images, z_dim)
+
+
+def test_gen_loss(num_images):
+    z_dim = 64
+    device = "cpu"
+    lr=0.00001
+    criterion = nn.BCEWithLogitsLoss()
+    gen = Generator(z_dim).to(device)
+    gen_opt = torch.optim.Adam(gen.parameters(), lr=lr)
+    disc = Discriminator().to(device)
+    disc_opt = torch.optim.Adam(disc.parameters(), lr=lr)
+
+    gen_loss = get_gen_loss(gen, disc, criterion, num_images, z_dim, device)
+
+    # Check that the loss is reasonable
+    assert (gen_loss - 0.7).abs() < 0.1
+    gen_loss.backward()
+    old_weight = gen.gen[0][0].weight.clone()
+    gen_opt.step()
+    new_weight = gen.gen[0][0].weight
+    assert not torch.all(torch.eq(old_weight, new_weight))
+
+
+test_gen_reasonable(10)
+test_gen_loss(18)
+print("Success!")

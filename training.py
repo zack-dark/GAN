@@ -17,7 +17,7 @@ lr = 0.00001
 
 
 dataloader = DataLoader(
-    MNIST('.', download=False, transform=transforms.ToTensor()),
+    MNIST('.', download=True, transform=transforms.ToTensor()),
     batch_size=batch_size,
     shuffle=True
 )
